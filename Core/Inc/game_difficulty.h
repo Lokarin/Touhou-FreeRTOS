@@ -9,6 +9,17 @@ typedef enum
 
 extern GameDifficulty g_difficulty;
 
+static inline float difficulty_factor(void)
+{
+    switch (g_difficulty)
+    {
+        case DIFFICULTY_EASY:    return 1.0f;
+        case DIFFICULTY_MEDIUM:  return 2.0f;
+        case DIFFICULTY_LUNATIC: return 3.0f;
+        default:                 return 1.0f;
+    }
+}
+
 /* Estado interno do menu — compartilhado entre TaskGame e TaskDisplay */
 extern int g_menu_state;   // 0 = tela start, 1 = seleção de dificuldade
 extern int g_menu_cursor;  // 0 = Easy, 1 = Medium, 2 = Lunatic

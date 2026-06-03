@@ -34,6 +34,10 @@
 #include "backgrounds.h"
 #include "background.h"
 #include "game_difficulty.h"
+#include "wave_manager.h"
+#include "level1.h"
+#include "sprites.h"
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,7 +47,13 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define START_X    40
+#define START_Y    40
+#define OPT_X      50
+#define OPT_EASY_Y 20
+#define OPT_MED_Y  42
+#define OPT_LUN_Y  66
+#define CURSOR_X   40
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -61,7 +71,7 @@ SPI_HandleTypeDef hspi1;
 osThreadId_t TaskDisplayHandle;
 const osThreadAttr_t TaskDisplay_attributes = {
   .name = "TaskDisplay",
-  .stack_size = 2048 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for TaskInput */
@@ -447,89 +457,99 @@ static void MX_GPIO_Init(void)
 void StartTaskDisplay(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  GameState prev_state       = (GameState)-1;
-  int       prev_menu_state  = -1;
-  int       prev_menu_cursor = -1;
 
-  float prev_px = -1, prev_py = -1;
-  float prev_bx[MAX_PLAYER_BULLETS];
-  float prev_by[MAX_PLAYER_BULLETS];
-  int   prev_ba[MAX_PLAYER_BULLETS];
+  // ── Histórico do dirty-rect — static = RAM estática, não ocupa stack ──
+  static float prev_px = -1, prev_py = -1;
+  static float prev_bx[MAX_PLAYER_BULLETS];
+  static float prev_by[MAX_PLAYER_BULLETS];
+  static int   prev_ba[MAX_PLAYER_BULLETS];
 
-  float prev_ex[MAX_ENEMIES];
-  float prev_ey[MAX_ENEMIES];
-  int   prev_ew[MAX_ENEMIES];
-  int   prev_eh[MAX_ENEMIES];
-  int   prev_ea[MAX_ENEMIES];
-  int prev_ef[MAX_ENEMIES];
+  static float prev_ex[MAX_ENEMIES];
+  static float prev_ey[MAX_ENEMIES];
+  static int   prev_ew[MAX_ENEMIES];
+  static int   prev_eh[MAX_ENEMIES];
+  static int   prev_ea[MAX_ENEMIES];
+  static int   prev_ef[MAX_ENEMIES];
 
+  static float prev_ebx[MAX_ENEMY_BULLETS];
+  static float prev_eby[MAX_ENEMY_BULLETS];
+  static int   prev_eba[MAX_ENEMY_BULLETS];
+  static int   prev_ebw[MAX_ENEMY_BULLETS];
+  static int   prev_ebh[MAX_ENEMY_BULLETS];
 
-  float prev_ebx[MAX_ENEMY_BULLETS];
-  float prev_eby[MAX_ENEMY_BULLETS];
-  int   prev_eba[MAX_ENEMY_BULLETS];
+  static GameState prev_state       = (GameState)-1;
+  static int       prev_menu_state  = -1;
+  static int       prev_menu_cursor = -1;
 
+  // ── Snapshots — static para não ocupar stack ──────────────────────────
+  static Player snap_player;
+  static Enemy  snap_enemies[MAX_ENEMIES];
+  static Bullet snap_enemy_bullets[MAX_ENEMY_BULLETS];
+  static GameState snap_state;
+  static int snap_menu_state;
+  static int snap_menu_cursor;
+
+  // Inicializa histórico
   for (int i = 0; i < MAX_PLAYER_BULLETS; i++) {
       prev_bx[i] = 0; prev_by[i] = 0; prev_ba[i] = 0;
   }
-
   for (int i = 0; i < MAX_ENEMIES; i++) {
       prev_ex[i] = 0; prev_ey[i] = 0;
       prev_ew[i] = 0; prev_eh[i] = 0;
-      prev_ea[i] = 0;
-      prev_ef[i] = 0;
+      prev_ea[i] = 0; prev_ef[i] = 0;
   }
-
   for (int i = 0; i < MAX_ENEMY_BULLETS; i++) {
-      prev_ebx[i] = 0; prev_eby[i] = 0; prev_eba[i] = 0;
+      prev_ebx[i] = 0; prev_eby[i] = 0;
+      prev_eba[i] = 0; prev_ebw[i] = 0; prev_ebh[i] = 0;
   }
-
-  #define START_X    40
-  #define START_Y    100
-  #define OPT_X      50
-  #define OPT_EASY_Y 20
-  #define OPT_MED_Y  42
-  #define OPT_LUN_Y  66
-  #define CURSOR_X   40
 
   for(;;)
   {
-	  osMutexAcquire(mutexSPIHandle, osWaitForever);
-	  osMutexAcquire(mutexGameHandle, osWaitForever);
+      // ── Snapshot rápido com mutex — solta antes de renderizar ─────────
+      osMutexAcquire(mutexGameHandle, osWaitForever);
+      memcpy(&snap_player,       &g_player,       sizeof(Player));
+      memcpy(snap_enemies,        g_enemies,       sizeof(Enemy)   * MAX_ENEMIES);
+      memcpy(snap_enemy_bullets,  g_enemy_bullets, sizeof(Bullet)  * MAX_ENEMY_BULLETS);
+      snap_state       = g_state;
+      snap_menu_state  = g_menu_state;
+      snap_menu_cursor = g_menu_cursor;
+      osMutexRelease(mutexGameHandle);
 
-	  if (g_state != prev_state)
-	  {
-	      if (g_state == STATE_MENU)
-	      {
-	          //Display_FillScreen(COLOR_RED);
-	      	  background_set(menu_bg);
-	      	  background_draw_region(0, 0, SCREEN_W, SCREEN_H);
-              prev_menu_state  = -1;  // força redraw dos sprites do menu
-              prev_menu_cursor = -1;
-	      }
-	      else if (g_state == STATE_PLAYING)
-	      {
-	          //Display_FillScreen(COLOR_BLACK);
-	      	  background_set(bg1);
-	      	  background_draw_region(0, 0, SCREEN_W, SCREEN_H);
-	      }
-	      else if (g_state == STATE_GAME_OVER)
-	      {
-	          //Display_FillScreen(COLOR_MAGENTA);
-	      	  background_set(game_over_bg);
-	      	  background_draw_region(0, 0, SCREEN_W, SCREEN_H);
-	      }
+      // ── Renderização sem mutex de game — só segura o SPI ─────────────
+      osMutexAcquire(mutexSPIHandle, osWaitForever);
 
-	      prev_state = g_state;
-	  }
-
-      if (g_state == STATE_MENU)
+      // ── Bloco 1: transição de estado ──────────────────────────────────
+      if (snap_state != prev_state)
       {
-          int menu_changed = (g_menu_state  != prev_menu_state ||
-                              g_menu_cursor != prev_menu_cursor);
+          if (snap_state == STATE_MENU)
+          {
+              background_set(menu_bg);
+              background_draw_region(0, 0, SCREEN_W, SCREEN_H);
+              prev_menu_state  = -1;
+              prev_menu_cursor = -1;
+          }
+          else if (snap_state == STATE_PLAYING)
+          {
+              background_set(bg1);
+              background_draw_region(0, 0, SCREEN_W, SCREEN_H);
+          }
+          else if (snap_state == STATE_GAME_OVER)
+          {
+              background_set(game_over_bg);
+              background_draw_region(0, 0, SCREEN_W, SCREEN_H);
+          }
+          prev_state = snap_state;
+      }
+
+      // ── Bloco 2: menu ─────────────────────────────────────────────────
+      if (snap_state == STATE_MENU)
+      {
+          int menu_changed = (snap_menu_state  != prev_menu_state ||
+                              snap_menu_cursor != prev_menu_cursor);
 
           if (menu_changed)
           {
-              if (g_menu_state == 0)
+              if (snap_menu_state == 0)
               {
                   if (prev_menu_state == 1)
                   {
@@ -538,7 +558,7 @@ void StartTaskDisplay(void *argument)
                       background_draw_region(OPT_X, OPT_MED_Y,     text_medium.width,   text_medium.height);
                       background_draw_region(OPT_X, OPT_LUN_Y,     text_lunatic.width,  text_lunatic.height);
                   }
-                  //sprite_draw(&text_start, START_X, START_Y, 0);
+                  sprite_draw(&text_start, START_X, START_Y, 0);
               }
               else
               {
@@ -558,51 +578,49 @@ void StartTaskDisplay(void *argument)
                       background_draw_region(CURSOR_X, cursor_ys[prev_menu_cursor],
                                              select_cursor.width, select_cursor.height);
 
-                  sprite_draw(&select_cursor, CURSOR_X, cursor_ys[g_menu_cursor], 0);
+                  sprite_draw(&select_cursor, CURSOR_X, cursor_ys[snap_menu_cursor], 0);
               }
 
-              prev_menu_state  = g_menu_state;
-              prev_menu_cursor = g_menu_cursor;
+              prev_menu_state  = snap_menu_state;
+              prev_menu_cursor = snap_menu_cursor;
           }
 
-          osMutexRelease(mutexGameHandle);
           osMutexRelease(mutexSPIHandle);
           osDelay(8);
           continue;
       }
 
-	  if (g_state == STATE_MENU || g_state == STATE_GAME_OVER)
-	  {
-	      osMutexRelease(mutexGameHandle);
-	      osMutexRelease(mutexSPIHandle);
-	      osDelay(8);
-	      continue;
-	  }
-
-      float cur_px = g_player.x;
-      float cur_py = g_player.y;
-
-      // Apaga player se moveu
-      if (prev_px >= 0) {
-          if ((int)prev_px != (int)cur_px || (int)prev_py != (int)cur_py)
-        	  //renderer_draw_rect(prev_px - 6, prev_py - 10, 12, 21, 0x000000);
-        	  background_draw_region(prev_px - 6, prev_py - 10, 12, 21);
+      if (snap_state == STATE_GAME_OVER)
+      {
+          osMutexRelease(mutexSPIHandle);
+          osDelay(8);
+          continue;
       }
 
-      // ── Apaga bullets que sumiram ou se moveram ────────────────
+      // ── Bloco 3: dirty-rect do jogo ───────────────────────────────────
+
+      // Player
+      float cur_px = snap_player.x;
+      float cur_py = snap_player.y;
+
+      if (prev_px >= 0) {
+          if ((int)prev_px != (int)cur_px || (int)prev_py != (int)cur_py)
+              background_draw_region(prev_px - 6, prev_py - 10, 12, 21);
+      }
+
+      // Bullets do player
       for (int i = 0; i < MAX_PLAYER_BULLETS; i++) {
-          float cur_bx = g_player.bullets[i].def.hitbox.x;
-          float cur_by = g_player.bullets[i].def.hitbox.y;
-          int   cur_ba = g_player.bullets[i].active;
+          float cur_bx = snap_player.bullets[i].def.hitbox.x;
+          float cur_by = snap_player.bullets[i].def.hitbox.y;
+          int   cur_ba = snap_player.bullets[i].active;
 
           if (prev_ba[i]) {
               if (!cur_ba || (int)prev_bx[i] != (int)cur_bx || (int)prev_by[i] != (int)cur_by)
-                  //renderer_draw_rect(prev_bx[i], prev_by[i], 2, 4, 0x000000);
-            	  background_draw_region(
-            	      prev_bx[i] - player_bullet.width  / 2,
-            	      prev_by[i] - player_bullet.height / 2,
-            	      player_bullet.width,
-            	      player_bullet.height);
+                  background_draw_region(
+                      prev_bx[i] - player_bullet.width  / 2,
+                      prev_by[i] - player_bullet.height / 2,
+                      player_bullet.width,
+                      player_bullet.height);
           }
 
           prev_bx[i] = cur_bx;
@@ -610,59 +628,60 @@ void StartTaskDisplay(void *argument)
           prev_ba[i] = cur_ba;
       }
 
-      // ── Apaga inimigos que morreram ou se moveram ──────────────
+      // Inimigos
       for (int i = 0; i < MAX_ENEMIES; i++) {
-          if (prev_ea[i] && (!g_enemies[i].active ||
-              (int)prev_ex[i] != (int)g_enemies[i].x ||
-              (int)prev_ey[i] != (int)g_enemies[i].y ||
-              prev_ef[i] != g_enemies[i].anim_frame))  // ← novo
+          if (prev_ea[i] && (!snap_enemies[i].active ||
+              (int)prev_ex[i] != (int)snap_enemies[i].x ||
+              (int)prev_ey[i] != (int)snap_enemies[i].y ||
+              prev_ef[i] != snap_enemies[i].anim_frame))
           {
-              //renderer_draw_rect(prev_ex[i] - prev_ew[i]/2, prev_ey[i] - prev_eh[i]/2, prev_ew[i], prev_eh[i], 0x000000);
-              background_draw_region(prev_ex[i] - prev_ew[i]/2, prev_ey[i] - prev_eh[i]/2, prev_ew[i], prev_eh[i]);
+              background_draw_region(prev_ex[i] - prev_ew[i]/2,
+                                     prev_ey[i] - prev_eh[i]/2,
+                                     prev_ew[i], prev_eh[i]);
           }
-          if (g_enemies[i].x + g_enemies[i].w/2 > 0 &&
-              g_enemies[i].x - g_enemies[i].w/2 < SCREEN_W)
+
+          if (snap_enemies[i].x + snap_enemies[i].w/2 > 0 &&
+              snap_enemies[i].x - snap_enemies[i].w/2 < SCREEN_W)
           {
-              prev_ex[i] = g_enemies[i].x;
-              prev_ey[i] = g_enemies[i].y;
-              prev_ew[i] = g_enemies[i].w;
-              prev_eh[i] = g_enemies[i].h;
-              prev_ef[i] = g_enemies[i].anim_frame;
+              prev_ex[i] = snap_enemies[i].x;
+              prev_ey[i] = snap_enemies[i].y;
+              prev_ew[i] = snap_enemies[i].w;
+              prev_eh[i] = snap_enemies[i].h;
+              prev_ef[i] = snap_enemies[i].anim_frame;
           }
-          prev_ea[i] = g_enemies[i].active;
+          prev_ea[i] = snap_enemies[i].active;
       }
 
+      // Bullets inimigos — apaga sempre (balas se movem todo frame)
       for (int i = 0; i < MAX_ENEMY_BULLETS; i++) {
-          float cur_ebx = g_enemy_bullets[i].def.hitbox.x;
-          float cur_eby = g_enemy_bullets[i].def.hitbox.y;
-          int   cur_eba = g_enemy_bullets[i].active;
+          if (!prev_eba[i] && !snap_enemy_bullets[i].active) continue;
 
-          if (prev_eba[i]) {
-              if (!cur_eba || (int)prev_ebx[i] != (int)cur_ebx || (int)prev_eby[i] != (int)cur_eby)
-                  //renderer_draw_rect(prev_ebx[i] - 1, prev_eby[i] - 1, 3, 3, 0x000000);
-            	  background_draw_region(
-            	      prev_ebx[i] - bullet_green_small.width  / 2,
-            	      prev_eby[i] - bullet_green_small.height / 2,
-            	      bullet_green_small.width,
-            	      bullet_green_small.height);
-          }
+          if (prev_eba[i])
+              background_draw_region(
+                  prev_ebx[i] - prev_ebw[i] / 2,
+                  prev_eby[i] - prev_ebh[i] / 2,
+                  prev_ebw[i], prev_ebh[i]);
 
-          prev_ebx[i] = cur_ebx;
-          prev_eby[i] = cur_eby;
-          prev_eba[i] = cur_eba;
+          const Sprite *spr = snap_enemy_bullets[i].def.sprite
+                            ? snap_enemy_bullets[i].def.sprite
+                            : &bullet_green_small;
+
+          prev_ebx[i] = snap_enemy_bullets[i].def.hitbox.x;
+          prev_eby[i] = snap_enemy_bullets[i].def.hitbox.y;
+          prev_eba[i] = snap_enemy_bullets[i].active;
+          prev_ebw[i] = spr->width;
+          prev_ebh[i] = spr->height;
       }
 
       prev_px = cur_px;
       prev_py = cur_py;
 
-      // ── Desenha frame atual ────────────────────────────────────
-      player_draw(&g_player);
-      enemies_draw(g_enemies, MAX_ENEMIES);
-      enemy_bullets_draw(g_enemy_bullets, MAX_ENEMY_BULLETS);
+      // ── Draw ──────────────────────────────────────────────────────────
+      player_draw(&snap_player);
+      enemies_draw(snap_enemies, MAX_ENEMIES);
+      enemy_bullets_draw(snap_enemy_bullets, MAX_ENEMY_BULLETS);
 
-      osMutexRelease(mutexGameHandle);
       osMutexRelease(mutexSPIHandle);
-
       osDelay(8);
   }
   /* USER CODE END 5 */
@@ -707,12 +726,7 @@ void StartTaskGame(void *argument)
   Input_State input = {0};
   uint32_t last = time_get_ms();
 
-  player_init(&g_player);
-  enemies_init(g_enemies, MAX_ENEMIES);
-  enemy_bullets_init(g_enemy_bullets, MAX_ENEMY_BULLETS);
-
-  // Spawna alguns inimigos de teste
-  windmill_spawn(g_enemies, MAX_ENEMIES, -10.0f, 20.0f);
+  game_reset();
 
   int input_cooldown = 0;
 
@@ -766,25 +780,27 @@ void StartTaskGame(void *argument)
                 	g_difficulty  = (GameDifficulty)g_menu_cursor;
                 	g_menu_state  = 0;   // reseta para próxima vez
                 	g_menu_cursor = 0;
+                	game_reset();
                 	g_state       = STATE_PLAYING;
                 	input_cooldown = 10;
             }
         	}
         	break;
 
-        case STATE_PLAYING:
-            osMutexAcquire(mutexGameHandle, osWaitForever);
-            player_update(&g_player, &input, delta);
-            enemies_update(g_enemies, MAX_ENEMIES, &g_player, delta);
-            enemy_bullets_update(g_enemy_bullets, MAX_ENEMY_BULLETS, delta);
+    	case STATE_PLAYING:
+    	    osMutexAcquire(mutexGameHandle, osWaitForever);
+    	    player_update(&g_player, &input, delta);
+    	    enemies_update(g_enemies, MAX_ENEMIES, &g_player, delta);
+    	    enemy_bullets_update(g_enemy_bullets, MAX_ENEMY_BULLETS, delta);
 
-            if (enemy_bullets_check_player(g_enemy_bullets, MAX_ENEMY_BULLETS, &g_player))
-            {
-                g_state = STATE_GAME_OVER;
-            }
+    	    if (wave_manager_update(g_enemies, MAX_ENEMIES, delta))
+    	        g_state = STATE_WIN;  // todos os eventos disparados
 
-            osMutexRelease(mutexGameHandle);
-            break;
+    	    if (enemy_bullets_check_player(g_enemy_bullets, MAX_ENEMY_BULLETS, &g_player))
+    	        g_state = STATE_GAME_OVER;
+
+    	    osMutexRelease(mutexGameHandle);
+    	    break;
 
         case STATE_GAME_OVER:
         	if (input.click)
@@ -795,7 +811,7 @@ void StartTaskGame(void *argument)
         	break;
 
         case STATE_WIN:
-            // por enquanto vazio
+    		g_state = STATE_MENU;
             break;
     }
 

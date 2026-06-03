@@ -34,17 +34,19 @@ void update_bullets(Bullet *bullets, int max_bullets, float delta)
     }
 }
 
-void draw_bullets(Bullet *bullets, int max_bullets)
+void draw_bullets(Bullet *bullets, int max_bullets, const Sprite *default_sprite)
 {
     for (int i = 0; i < max_bullets; i++)
     {
-        if (bullets[i].active)
-        {
-            //renderer_draw_rect(bullets[i].def.hitbox.x, bullets[i].def.hitbox.y, 2, 4, 0xFFFFFF);
-        	sprite_draw(&player_bullet,
-        	            bullets[i].def.hitbox.x - player_bullet.width  / 2.0f,
-        	            bullets[i].def.hitbox.y - player_bullet.height / 2.0f,
-        	            0);
-        }
+        if (!bullets[i].active) continue;
+
+        const Sprite *spr = bullets[i].def.sprite
+                          ? bullets[i].def.sprite
+                          : default_sprite;
+
+        sprite_draw(spr,
+                    bullets[i].def.hitbox.x - spr->width  / 2.0f,
+                    bullets[i].def.hitbox.y - spr->height / 2.0f,
+                    0);
     }
 }

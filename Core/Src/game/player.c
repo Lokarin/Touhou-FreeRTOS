@@ -56,6 +56,7 @@ void player_shoot(Player *player)
     BulletDef def;
     def.speed    = 512.0f;
     def.hitbox.r = 3.0f;
+    def.sprite = &player_bullet;
 
     // Fileira esquerda — levemente angulada para a esquerda
     def.hitbox.x = player->x - 5.0f;
@@ -88,7 +89,7 @@ void player_shoot(Player *player)
 
 void player_draw(Player *player)
 {
-    draw_bullets(player->bullets, MAX_PLAYER_BULLETS);
+	draw_bullets(player->bullets, MAX_PLAYER_BULLETS, &player_bullet);
 
     // escolhe sprite baseado no movimento
     if (player->vx > 0)

@@ -60,13 +60,15 @@ void enemy_bullets_draw(Bullet *pool, int max)
 {
     for (int i = 0; i < max; i++)
     {
-        if (!pool[i].active)
-            continue;
+        if (!pool[i].active) continue;
 
-        //renderer_draw_rect(pool[i].def.hitbox.x - 1, pool[i].def.hitbox.y - 1, 3, 3, 0xFF6600);
-        sprite_draw(&bullet_green_small,
-                    pool[i].def.hitbox.x - bullet_green_small.width  / 2,
-                    pool[i].def.hitbox.y - bullet_green_small.height / 2,
+        const Sprite *spr = pool[i].def.sprite
+                          ? pool[i].def.sprite
+                          : &bullet_green_small;  // fallback
+
+        sprite_draw(spr,
+                    pool[i].def.hitbox.x - spr->width  / 2,
+                    pool[i].def.hitbox.y - spr->height / 2,
                     0);
     }
 }

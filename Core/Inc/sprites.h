@@ -24,6 +24,11 @@ extern const Sprite text_easy;
 extern const Sprite text_medium;
 extern const Sprite text_lunatic;
 extern const Sprite select_cursor;
+extern const Sprite fairy_1;
+extern const Sprite fairy_2;
+extern const Sprite soul_1;
+extern const Sprite soul_2;
+extern const Sprite small_white_bullet;
 
 
 /* Desenha um sprite na posição (x, y).
