@@ -7,7 +7,7 @@ void player_init(Player *player)
     player->speed = 80.0f;
     player->w = 10;
     player->h = 10;
-    player->hitbox_r = 2.0f;
+    player->hitbox_r = 1.5f;
     player->shoot_timer = 0.0f;
 }
 

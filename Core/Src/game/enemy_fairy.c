@@ -6,8 +6,8 @@
 
 #define FAIRY_W              16
 #define FAIRY_H              16
-#define FAIRY_HITBOX_R       8.0f
-#define FAIRY_HP             10
+#define FAIRY_HITBOX_R       6.0f
+#define FAIRY_HP             13
 #define FAIRY_SPEED          60.0f
 #define FAIRY_BULLET_SPD     40.0f
 #define FAIRY_BULLET_R       2.0f
@@ -50,6 +50,7 @@ static void fairy_shoot_ring(Enemy *self)
         spawn_bullet(g_enemy_bullets, MAX_ENEMY_BULLETS, &def);
     }
 
+    if (bullets <= 0) return;
     self->y_stop += M_PI / bullets;
 }
 

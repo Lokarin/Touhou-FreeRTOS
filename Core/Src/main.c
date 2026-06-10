@@ -37,6 +37,7 @@
 #include "wave_manager.h"
 #include "level1.h"
 #include "sprites.h"
+#include "boss1.h"
 #include <string.h>
 /* USER CODE END Includes */
 
@@ -458,6 +459,9 @@ void StartTaskDisplay(void *argument)
 {
   /* USER CODE BEGIN 5 */
 
+  static int prev_hp_w = -1;
+  static int boss_bg_active = 0;
+
   // ── Histórico do dirty-rect — static = RAM estática, não ocupa stack ──
   static float prev_px = -1, prev_py = -1;
   static float prev_bx[MAX_PLAYER_BULLETS];
@@ -530,7 +534,7 @@ void StartTaskDisplay(void *argument)
           }
           else if (snap_state == STATE_PLAYING)
           {
-              background_set(bg1);
+              background_set(bg3);
               background_draw_region(0, 0, SCREEN_W, SCREEN_H);
           }
           else if (snap_state == STATE_GAME_OVER)
@@ -676,6 +680,52 @@ void StartTaskDisplay(void *argument)
       prev_px = cur_px;
       prev_py = cur_py;
 
+      // ── Barra de vida do boss ──────────────────────────────────
+      const Enemy *boss = NULL;
+      for (int i = 0; i < MAX_ENEMIES; i++) {
+          if (snap_enemies[i].active && snap_enemies[i].type == ENEMY_BOSS) {
+              boss = &snap_enemies[i];
+              break;
+          }
+      }
+
+      if (boss)
+      {
+    	  if (!boss_bg_active)
+    	  {
+    	      background_set(bg4);
+    	      background_draw_region(0, 0, SCREEN_W, SCREEN_H);
+
+    	      boss_bg_active = 1;
+    	  }
+
+          int hp_w = (boss->hp * 120) / BOSS1_HP;
+          if (hp_w < 0) hp_w = 0;
+
+          renderer_draw_rect(4, 2, 120, 4, 0x202020);  // fundo
+          if (hp_w > 0)
+              renderer_draw_rect(4, 2, hp_w, 4, 0xFFFF00);  // vida
+
+          prev_hp_w = hp_w;
+      }
+      else
+      {
+          if (boss_bg_active)
+          {
+              background_set(bg3);
+              background_draw_region(0, 0, SCREEN_W, SCREEN_H);
+
+              boss_bg_active = 0;
+          }
+
+          if (prev_hp_w >= 0)
+          {
+              background_draw_region(4, 2, 120, 4);
+
+              prev_hp_w = -1;
+          }
+      }
+
       // ── Draw ──────────────────────────────────────────────────────────
       player_draw(&snap_player);
       enemies_draw(snap_enemies, MAX_ENEMIES);
@@ -798,6 +848,12 @@ void StartTaskGame(void *argument)
 
     	    if (enemy_bullets_check_player(g_enemy_bullets, MAX_ENEMY_BULLETS, &g_player))
     	        g_state = STATE_GAME_OVER;
+
+    	    if (input.click)
+    	    {
+    	    	g_state = STATE_MENU;
+    	    	input_cooldown = 10;
+    	    }
 
     	    osMutexRelease(mutexGameHandle);
     	    break;

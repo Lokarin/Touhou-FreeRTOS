@@ -35,8 +35,14 @@ struct Enemy
     float x_stop;
     float y_stop;
 
+    float shoot_timer;
+    float shoot_timer2;
+    float shoot_angle;
+    float phase_timer;
+
     void (*update)(Enemy *self, Player *player, float delta);
     void (*draw)  (Enemy *self);
+    void (*on_death)(Enemy *self, Player *player);
 
     float anim_timer;
     int   anim_frame;

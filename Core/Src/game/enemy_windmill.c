@@ -6,8 +6,8 @@
 
 #define WINDMILL_W          20
 #define WINDMILL_H          20
-#define WINDMILL_HITBOX_R   4.0f
-#define WINDMILL_HP         10
+#define WINDMILL_HITBOX_R   8.0f
+#define WINDMILL_HP         20
 #define WINDMILL_IN_SPEED   40.0f
 #define WINDMILL_SHOOT_TIME 4.0f
 #define WINDMILL_SHOOT_CD   2.0f

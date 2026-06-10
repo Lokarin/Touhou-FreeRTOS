@@ -29,6 +29,10 @@ extern const Sprite fairy_2;
 extern const Sprite soul_1;
 extern const Sprite soul_2;
 extern const Sprite small_white_bullet;
+extern const Sprite big_purple_bullet;
+extern const Sprite bullet_purple_small;
+extern const Sprite bullet_yellow_small;
+extern const Sprite kurumi1;
 
 
 /* Desenha um sprite na posição (x, y).

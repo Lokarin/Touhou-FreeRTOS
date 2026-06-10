@@ -31,6 +31,11 @@ int enemy_spawn(Enemy *enemies, int max,
             enemies[i].w           = w;
             enemies[i].h           = h;
             enemies[i].hitbox_r    = hitbox_r;
+            enemies[i].shoot_timer = 0.0f;
+            enemies[i].shoot_timer2= 0.0f;
+            enemies[i].shoot_angle = 0.0f;
+            enemies[i].phase_timer = 0.0f;
+            enemies[i].on_death    = NULL;
             enemies[i].hp          = hp;
             enemies[i].type        = type;
             enemies[i].timer       = 0.0f;
@@ -73,7 +78,11 @@ void enemy_check_bullet_hits(Enemy *enemy, Player *player)
             enemy->hp--;
 
             if (enemy->hp <= 0)
+            {
+                if (enemy->on_death)
+                    enemy->on_death(enemy, player);
                 enemy->active = 0;
+            }
 
             break;
         }
